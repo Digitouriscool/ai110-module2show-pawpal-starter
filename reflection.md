@@ -28,8 +28,11 @@ To represent the result of the scheduling process, I included a `DailySchedule` 
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+One tradeoff my scheduler makes is in the conflict detection algorithm. It checks each task's preferred start time and duration to see whether two preferred time windows overlap, then returns warning messages instead of blocking the schedule or crashing the program. This is simple and readable, but it does not automatically resolve the conflict or move one task to a better time.
+
+I asked my AI coding assistant how this algorithm could be simplified for readability or performance. A more Pythonic suggestion was to use `itertools.combinations()` to compare every pair of tasks. That version was shorter, but I decided to keep the current nested-loop version because it is easier to follow while I am still developing and debugging the scheduler. For this project, clear logic is more useful than a slightly shorter implementation.
+
+This tradeoff is reasonable because PawPal+ is a small scheduling app. A pet owner mainly needs to know when two tasks compete for the same time, not necessarily have the app solve every conflict automatically yet.
 
 ---
 

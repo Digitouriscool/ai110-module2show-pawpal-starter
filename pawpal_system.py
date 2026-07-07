@@ -17,11 +17,14 @@ class Task:
     priority: str = "medium"
     preferred_time: str = ""
     completed: bool = False
+    due_date: date = field(default_factory=date.today)
 
     def __post_init__(self):
         """Normalize and validate task fields after initialization."""
         self.priority = self.priority.lower()
         self.frequency = self.frequency.lower()
+        if isinstance(self.due_date, str):
+            self.due_date = date.fromisoformat(self.due_date)
         if self.duration_minutes <= 0:
             raise ValueError("Task duration must be greater than 0 minutes.")
         if self.priority not in PRIORITY_WEIGHTS:
@@ -46,14 +49,41 @@ class Task:
 
     def is_required_today(self):
         """Return whether this task should be scheduled today."""
-        return not self.completed and self.frequency in {"daily", "today", "once"}
+        return (
+            not self.completed
+            and self.frequency in {"daily", "today", "once", "weekly"}
+            and self.due_date <= date.today()
+        )
+
+    def create_next_occurrence(self):
+        """Create the next due task for daily or weekly recurring tasks.
+
+        Daily tasks are copied with a due date of tomorrow. Weekly tasks are
+        copied with a due date one week from today. Non-recurring tasks return
+        None so callers can skip adding a follow-up task.
+        """
+        if self.frequency == "daily":
+            next_due_date = date.today() + timedelta(days=1)
+        elif self.frequency == "weekly":
+            next_due_date = date.today() + timedelta(weeks=1)
+        else:
+            return None
+
+        return Task(
+            description=self.description,
+            duration_minutes=self.duration_minutes,
+            frequency=self.frequency,
+            priority=self.priority,
+            preferred_time=self.preferred_time,
+            due_date=next_due_date,
+        )
 
     def describe(self):
         """Return a readable summary of this task."""
         status = "done" if self.completed else "pending"
         return (
             f"{self.description} ({self.duration_minutes} min, "
-            f"{self.priority} priority, {self.frequency}, {status})"
+            f"{self.priority} priority, {self.frequency}, due {self.due_date}, {status})"
         )
 
 
@@ -170,6 +200,85 @@ class Scheduler:
             ),
         )
 
+    def sort_by_time(self, pet_tasks):
+        """Return pet-task pairs sorted by the task's preferred HH:MM time.
+
+        Because preferred times use zero-padded HH:MM strings, a normal string
+        comparison sorts them in chronological order. Tasks without a preferred
+        time are placed last.
+        """
+        return sorted(pet_tasks, key=lambda pet_task: pet_task[1].preferred_time or "99:99")
+
+    def filter_tasks(self, pet_tasks, completed=None, pet_name=None):
+        """Return pet-task pairs matching optional status and pet filters.
+
+        The completed argument can be True or False. The pet_name argument is
+        matched case-insensitively. If a filter is omitted, that filter is not
+        applied.
+        """
+        filtered_tasks = pet_tasks
+
+        if completed is not None:
+            filtered_tasks = [
+                (pet, task)
+                for pet, task in filtered_tasks
+                if task.completed == completed
+            ]
+
+        if pet_name is not None:
+            filtered_tasks = [
+                (pet, task)
+                for pet, task in filtered_tasks
+                if pet.name.lower() == pet_name.lower()
+            ]
+
+        return filtered_tasks
+
+    def _preferred_time_window(self, task):
+        """Return a task's preferred start/end datetimes for conflict checks.
+
+        The start comes from preferred_time and the end is calculated by adding
+        duration_minutes. Tasks with no preferred_time return None.
+        """
+        if not task.preferred_time:
+            return None
+
+        start = datetime.strptime(task.preferred_time, "%H:%M")
+        end = start + timedelta(minutes=task.duration_minutes)
+        return start, end
+
+    def detect_conflicts(self, pet_tasks):
+        """Return warnings for tasks whose preferred time windows overlap.
+
+        This method is intentionally lightweight: it reports conflicts between
+        required tasks but does not raise an error or reschedule anything.
+        """
+        warnings = []
+        timed_tasks = []
+
+        for pet, task in pet_tasks:
+            if not task.is_required_today():
+                continue
+            time_window = self._preferred_time_window(task)
+            if time_window is not None:
+                timed_tasks.append((pet, task, *time_window))
+
+        for index, first in enumerate(timed_tasks):
+            first_pet, first_task, first_start, first_end = first
+            for second in timed_tasks[index + 1:]:
+                second_pet, second_task, second_start, second_end = second
+                if first_start < second_end and second_start < first_end:
+                    warnings.append(
+                        "Warning: "
+                        f"{first_pet.name}'s {first_task.description} "
+                        f"({first_start.strftime('%H:%M')}-{first_end.strftime('%H:%M')}) "
+                        "conflicts with "
+                        f"{second_pet.name}'s {second_task.description} "
+                        f"({second_start.strftime('%H:%M')}-{second_end.strftime('%H:%M')})."
+                    )
+
+        return warnings
+
     def fits_available_time(self, task, remaining_minutes):
         """Return whether a task fits in the remaining available time."""
         return task.duration_minutes <= remaining_minutes
@@ -183,6 +292,7 @@ class Scheduler:
 
         schedule = []
         skipped_tasks = []
+        conflict_warnings = self.detect_conflicts(pet_tasks)
         remaining_minutes = owner.available_minutes
         current_time = datetime.strptime(self.start_time, "%H:%M")
 
@@ -209,6 +319,7 @@ class Scheduler:
             owner=owner,
             scheduled_items=schedule,
             skipped_tasks=skipped_tasks,
+            conflict_warnings=conflict_warnings,
         )
 
     def explain_choice(self, task):
@@ -219,13 +330,20 @@ class Scheduler:
         )
 
     def complete_task(self, owner, pet_name, task_description):
-        """Mark one task complete by owner, pet name, and task description."""
+        """Mark a task complete and add its next recurring occurrence if needed.
+
+        Daily and weekly tasks create a new incomplete Task with the next due
+        date. One-time tasks are only marked complete.
+        """
         pet = owner.get_pet(pet_name)
         if pet is None:
             raise ValueError(f"No pet found named {pet_name}.")
         for task in pet.tasks:
             if task.description == task_description:
                 task.mark_complete()
+                next_task = task.create_next_occurrence()
+                if next_task is not None:
+                    pet.add_task(next_task)
                 return task
         raise ValueError(f"No task found for {pet_name}: {task_description}")
 
@@ -236,6 +354,7 @@ class DailySchedule:
     owner: Owner
     scheduled_items: list = field(default_factory=list)
     skipped_tasks: list = field(default_factory=list)
+    conflict_warnings: list = field(default_factory=list)
 
     def add_item(self, item):
         """Add an item to the daily schedule."""
@@ -268,6 +387,11 @@ class DailySchedule:
             lines.append("Skipped tasks:")
             for pet, task in self.skipped_tasks:
                 lines.append(f"  {pet.name}: {task.description}")
+
+        if self.conflict_warnings:
+            lines.append("Warnings:")
+            for warning in self.conflict_warnings:
+                lines.append(f"  {warning}")
 
         return "\n".join(lines)
 

@@ -74,14 +74,17 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+PawPal+ includes several small scheduling algorithms that make the daily plan more useful than a manual task list.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Priority-based scheduling | `Scheduler.sort_tasks()`, `Scheduler.build_schedule()` | Builds the daily plan by sorting pending tasks by priority, preferred time, and duration. |
+| Sorting by preferred time | `Scheduler.sort_by_time()` | Sorts pet-task pairs by each task's `preferred_time` in `HH:MM` format. Tasks without a preferred time are placed last. |
+| Filtering by status or pet | `Scheduler.filter_tasks()` | Filters tasks by completion status, pet name, or both. This supports views such as "pending tasks" or "Luna's tasks." |
+| Available-time filtering | `Scheduler.fits_available_time()`, `Scheduler.build_schedule()` | Skips tasks that do not fit inside the owner's remaining available minutes. |
+| Conflict detection | `Scheduler._preferred_time_window()`, `Scheduler.detect_conflicts()` | Checks whether required tasks have overlapping preferred time windows and returns warning messages instead of crashing. |
+| Recurring tasks | `Task.create_next_occurrence()`, `Scheduler.complete_task()` | When a daily or weekly task is completed, a new incomplete task is created with the next due date. Daily tasks use tomorrow; weekly tasks use one week from today. |
+| Due-date checks | `Task.is_required_today()` | Only schedules incomplete tasks whose due date is today or earlier. |
 
 ## 📸 Demo Walkthrough
 
