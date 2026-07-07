@@ -1,0 +1,69 @@
+classDiagram
+    class Owner {
+        +string name
+        +int available_minutes
+        +list preferences
+        +add_pet(Pet pet)
+        +update_preferences(list preferences)
+        +set_available_time(int minutes)
+    }
+
+    class Pet {
+        +string name
+        +string species
+        +string breed
+        +int age
+        +list care_needs
+        +add_care_need(string need)
+        +get_profile() string
+    }
+
+    class CareTask {
+        +string title
+        +string category
+        +int duration_minutes
+        +string priority
+        +string preferred_time
+        +bool recurring
+        +get_priority_score() int
+        +is_required_today() bool
+        +describe() string
+    }
+
+    class Scheduler {
+        +dict priority_weights
+        +string start_time
+        +build_schedule(Owner owner, Pet pet, list tasks) DailySchedule
+        +sort_tasks(list tasks) list
+        +fits_available_time(CareTask task, int remaining_minutes) bool
+        +explain_choice(CareTask task) string
+    }
+
+    class DailySchedule {
+        +string date
+        +Pet pet
+        +Owner owner
+        +list scheduled_items
+        +list skipped_tasks
+        +add_item(ScheduleItem item)
+        +add_skipped_task(CareTask task)
+        +total_scheduled_minutes() int
+        +format_plan() string
+    }
+
+    class ScheduleItem {
+        +CareTask task
+        +string start_time
+        +string end_time
+        +string reason
+        +format_item() string
+        +overlaps_with(ScheduleItem other) bool
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" CareTask : needs
+    Scheduler --> DailySchedule : creates
+    DailySchedule "1" --> "0..*" ScheduleItem : contains
+    ScheduleItem "1" --> "1" CareTask : schedules
+    DailySchedule --> Owner : for
+    DailySchedule --> Pet : for
