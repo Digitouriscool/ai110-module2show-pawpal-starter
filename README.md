@@ -56,21 +56,31 @@ Daily plan for Jordan on 2026-07-06:
   09:00-09:15 | Mochi: Brush coat (15 min, low)
 ```
 
-## 🧪 Testing PawPal+
+## Testing PawPal+
+
+Run the full test suite with:
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+The tests cover task completion, adding tasks to pets, recurring daily and weekly task creation, one-time task completion, chronological sorting by preferred time, and conflict detection for duplicate preferred times.
 
+Successful test output:
+
+```text
+============================= test session starts ==============================
+platform darwin -- Python 3.14.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/digito/Documents/codepath/ai110/week4/ai110-module2show-pawpal-starter
+plugins: anyio-4.14.1
+collected 7 items
+
+tests/test_pawpal.py .......                                             [100%]
+
+============================== 7 passed in 0.02s ===============================
 ```
-# Paste your pytest output here
-```
+
+Confidence Level: 4/5 stars
 
 ## 📐 Smarter Scheduling
 

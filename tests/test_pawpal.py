@@ -68,6 +68,39 @@ def test_completing_once_task_does_not_create_next_occurrence():
     assert len(pet.tasks) == 1
 
 
+def test_sort_by_time_returns_tasks_in_chronological_order():
+    pet = Pet(name="Mochi", species="dog")
+    morning_walk = Task(
+        description="Morning walk",
+        duration_minutes=30,
+        preferred_time="08:00",
+    )
+    dinner = Task(
+        description="Dinner",
+        duration_minutes=10,
+        preferred_time="18:00",
+    )
+    medication = Task(
+        description="Medication",
+        duration_minutes=5,
+        preferred_time="12:00",
+    )
+
+    sorted_tasks = Scheduler().sort_by_time(
+        [
+            (pet, dinner),
+            (pet, morning_walk),
+            (pet, medication),
+        ]
+    )
+
+    assert [task.description for _pet, task in sorted_tasks] == [
+        "Morning walk",
+        "Medication",
+        "Dinner",
+    ]
+
+
 def test_scheduler_warns_when_preferred_times_conflict():
     owner = Owner(name="Jordan", available_minutes=60)
     dog = Pet(name="Mochi", species="dog")
