@@ -6,8 +6,11 @@ A user should be able to add basic user and pet information. Add or edit pet car
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+My initial UML design focuses on the core backend objects needed to plan daily pet care. I included an `Owner` class to store the owner's name, available time, preferences, and pets. I included a `Pet` class to store pet details such as name, species, breed, age, and care needs.
+
+I also included a `CareTask` class to represent individual tasks like feeding, walks, and grooming. Each task stores its title, category, duration, priority, preferred time, and whether it repeats. The `Scheduler` class is responsible for sorting tasks by priority, checking whether they fit within the owner's available time, and building a daily plan.
+
+To represent the result of the scheduling process, I included a `DailySchedule` class that stores the selected scheduled items and skipped tasks. Each scheduled task is represented by a `ScheduleItem`, which records the task, start time, end time, and explanation for why it was included.
 
 **b. Design changes**
 
