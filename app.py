@@ -1,8 +1,54 @@
+from datetime import time
+
 import streamlit as st
 
 from pawpal_system import Owner, Pet, Scheduler, Task
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
+
+
+def pet_task_rows(pet_tasks):
+    return [
+        {
+            "Pet": pet.name,
+            "Task": task.description,
+            "Duration": f"{task.duration_minutes} min",
+            "Priority": task.priority,
+            "Frequency": task.frequency,
+            "Preferred time": task.preferred_time or "Any time",
+            "Due date": task.due_date.isoformat(),
+            "Status": "Done" if task.completed else "Pending",
+        }
+        for pet, task in pet_tasks
+    ]
+
+
+def schedule_rows(schedule):
+    return [
+        {
+            "Time": f"{item['start_time']}-{item['end_time']}",
+            "Pet": item["pet"],
+            "Task": item["task"].description,
+            "Priority": item["task"].priority,
+            "Duration": f"{item['task'].duration_minutes} min",
+            "Why selected": item["reason"],
+        }
+        for item in schedule.scheduled_items
+    ]
+
+
+def skipped_task_rows(skipped_tasks):
+    return [
+        {
+            "Pet": pet.name,
+            "Task": task.description,
+            "Duration": f"{task.duration_minutes} min",
+            "Priority": task.priority,
+            "Reason": "Completed, not due today, or does not fit available time",
+        }
+        for pet, task in skipped_tasks
+    ]
+
 
 st.title("🐾 PawPal+")
 
@@ -41,6 +87,7 @@ if "owner" not in st.session_state:
     st.session_state.owner.add_pet(Pet(name="Mochi", species="dog"))
 
 owner = st.session_state.owner
+scheduler = Scheduler()
 
 st.subheader("Quick Demo Inputs")
 owner_name = st.text_input("Owner name", value=owner.name)
@@ -118,8 +165,9 @@ if pet_names:
         with col3:
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
-        frequency = st.selectbox("Frequency", ["daily", "today", "once"])
-        preferred_time = st.text_input("Preferred time", value="08:00")
+        frequency = st.selectbox("Frequency", ["daily", "weekly", "today", "once"])
+        preferred_time_value = st.time_input("Preferred time", value=time(8, 0))
+        preferred_time = preferred_time_value.strftime("%H:%M")
         add_task_submitted = st.form_submit_button("Add task")
 
     if add_task_submitted:
@@ -138,21 +186,45 @@ if pet_names:
 all_pet_tasks = owner.get_all_tasks(include_completed=True)
 
 if all_pet_tasks:
-    st.write("Current tasks:")
-    st.table(
-        [
-            {
-                "pet": pet.name,
-                "task": task.description,
-                "duration_minutes": task.duration_minutes,
-                "priority": task.priority,
-                "frequency": task.frequency,
-                "preferred_time": task.preferred_time,
-                "completed": task.completed,
-            }
-            for pet, task in all_pet_tasks
-        ]
+    st.write("Current tasks")
+
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    with filter_col1:
+        status_filter = st.selectbox("Status", ["Pending", "All", "Completed"])
+    with filter_col2:
+        pet_filter = st.selectbox("Pet filter", ["All pets", *pet_names])
+    with filter_col3:
+        sort_mode = st.selectbox(
+            "Sort tasks by",
+            ["Scheduler priority", "Preferred time"],
+        )
+
+    completed_filter = {"Pending": False, "Completed": True}.get(status_filter)
+    pet_name_filter = None if pet_filter == "All pets" else pet_filter
+    visible_pet_tasks = scheduler.filter_tasks(
+        all_pet_tasks,
+        completed=completed_filter,
+        pet_name=pet_name_filter,
     )
+
+    if sort_mode == "Preferred time":
+        visible_pet_tasks = scheduler.sort_by_time(visible_pet_tasks)
+    else:
+        visible_pet_tasks = scheduler.sort_tasks(visible_pet_tasks)
+
+    if visible_pet_tasks:
+        st.success(f"Showing {len(visible_pet_tasks)} task(s), sorted by {sort_mode.lower()}.")
+        st.table(pet_task_rows(visible_pet_tasks))
+    else:
+        st.info("No tasks match the selected filters.")
+
+    conflict_warnings = scheduler.detect_conflicts(owner.get_all_tasks())
+    if conflict_warnings:
+        st.warning(
+            "Some required tasks have overlapping preferred times. Consider changing one preferred time before relying on today's plan."
+        )
+        for warning in conflict_warnings:
+            st.warning(warning)
 else:
     st.info("No tasks yet. Add one above.")
 
@@ -162,6 +234,22 @@ st.subheader("Build Schedule")
 st.caption("This uses the Owner object stored in st.session_state.")
 
 if st.button("Generate schedule"):
-    scheduler = Scheduler()
     schedule = scheduler.build_schedule(owner)
-    st.text(schedule.format_plan())
+    if schedule.conflict_warnings:
+        st.warning(
+            "Schedule conflict detected. The plan can still be generated, but these tasks compete for the same preferred time."
+        )
+        for warning in schedule.conflict_warnings:
+            st.warning(warning)
+
+    if schedule.scheduled_items:
+        st.success(
+            f"Scheduled {len(schedule.scheduled_items)} task(s) for {schedule.total_scheduled_minutes()} minutes."
+        )
+        st.table(schedule_rows(schedule))
+    else:
+        st.info("No tasks were scheduled. Add pending tasks due today or increase available care time.")
+
+    if schedule.skipped_tasks:
+        st.warning("Some tasks were skipped.")
+        st.table(skipped_task_rows(schedule.skipped_tasks))

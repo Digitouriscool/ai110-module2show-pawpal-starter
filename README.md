@@ -1,6 +1,6 @@
 # PawPal+ (Module 2 Project)
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+**PawPal+** is a Streamlit app and Python scheduling system that helps pet owners plan daily care tasks across multiple pets.
 
 ## Scenario
 
@@ -10,17 +10,20 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 - Consider constraints (time available, priority, owner preferences)
 - Produce a daily plan and explain why it chose that plan
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+The app combines an object-oriented Python backend with a Streamlit interface and a CLI demo.
 
-## What you will build
+## Features
 
-Your final app should:
-
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+- Add and manage multiple pets for one owner.
+- Add pet care tasks with duration, priority, frequency, preferred time, and completion status.
+- Generate today's schedule from all pets owned by the user.
+- Sort tasks by priority, preferred time, and duration.
+- Sort task lists chronologically by preferred time.
+- Filter tasks by completion status or pet name.
+- Skip tasks that do not fit within the owner's available care time.
+- Detect preferred-time conflicts and show warning messages.
+- Create the next occurrence for completed daily and weekly recurring tasks.
+- Exclude completed tasks from today's schedule while still allowing them to appear in full task views.
 
 ## Getting started
 
@@ -32,28 +35,65 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+### Run The CLI Demo
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+```bash
+python main.py
+```
+
+### Run The Streamlit App
+
+```bash
+streamlit run app.py
+```
 
 ## 🖥️ Sample Output
 
 Terminal output from running `python main.py`:
 
 ```
+Tasks Sorted by Preferred Time
+==============================
+07:30 | Luna: Refresh water bowl (done)
+08:00 | Mochi: Morning walk (pending)
+09:00 | Mochi: Breakfast (pending)
+09:00 | Luna: Give medication (pending)
+17:00 | Mochi: Brush coat (pending)
+18:00 | Luna: Clean litter box (pending)
+19:00 | Mochi: Wash bedding (pending)
+
+Pending Tasks
+=============
+Mochi: Brush coat
+Mochi: Morning walk
+Mochi: Breakfast
+Mochi: Wash bedding
+Luna: Clean litter box
+Luna: Give medication
+
+Luna's Tasks
+============
+Luna: Clean litter box (pending)
+Luna: Give medication (pending)
+Luna: Refresh water bowl (done)
+
 Today's Schedule
 ================
 Daily plan for Jordan on 2026-07-06:
   08:00-08:30 | Mochi: Morning walk (30 min, high)
-  08:30-08:40 | Luna: Give medication (10 min, high)
-  08:40-09:00 | Luna: Clean litter box (20 min, medium)
-  09:00-09:15 | Mochi: Brush coat (15 min, low)
+  08:30-08:40 | Mochi: Breakfast (10 min, high)
+  08:40-08:50 | Luna: Give medication (10 min, high)
+  08:50-09:10 | Luna: Clean litter box (20 min, medium)
+Skipped tasks:
+  Mochi: Wash bedding
+  Mochi: Brush coat
+Warnings:
+  Warning: Mochi's Breakfast (09:00-09:10) conflicts with Luna's Give medication (09:00-09:10).
+
+Recurring Tasks Created After Completion
+========================================
+Mochi: Morning walk next due on 2026-07-07
+Mochi: Wash bedding next due on 2026-07-13
 ```
 
 ## Testing PawPal+
@@ -96,14 +136,63 @@ PawPal+ includes several small scheduling algorithms that make the daily plan mo
 | Recurring tasks | `Task.create_next_occurrence()`, `Scheduler.complete_task()` | When a daily or weekly task is completed, a new incomplete task is created with the next due date. Daily tasks use tomorrow; weekly tasks use one week from today. |
 | Due-date checks | `Task.is_required_today()` | Only schedules incomplete tasks whose due date is today or earlier. |
 
-## 📸 Demo Walkthrough
+## Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+The Streamlit UI lets a pet owner set their available care time, add pets, add tasks for a selected pet, view all current tasks, and generate today's schedule. Pet and task data are stored in `st.session_state`, so button clicks do not erase the current owner, pets, or tasks during the browser session.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+Example workflow:
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+1. Enter the owner's name and available care time for the day.
+2. Add a pet with name, species, age, and optional breed.
+3. Add a task for that pet with a duration, priority, frequency, and preferred time.
+4. Repeat for additional pets and tasks.
+5. Click **Generate schedule** to build today's plan from all pets.
+
+The scheduler behavior shown in the app and CLI demo includes priority-based ordering, chronological sorting by preferred time, filtering pending tasks, skipping tasks when the owner runs out of available minutes, conflict warnings for overlapping preferred times, and daily or weekly recurrence creation after task completion.
+
+Sample CLI output from `python main.py`:
+
+```text
+Tasks Sorted by Preferred Time
+==============================
+07:30 | Luna: Refresh water bowl (done)
+08:00 | Mochi: Morning walk (pending)
+09:00 | Mochi: Breakfast (pending)
+09:00 | Luna: Give medication (pending)
+17:00 | Mochi: Brush coat (pending)
+18:00 | Luna: Clean litter box (pending)
+19:00 | Mochi: Wash bedding (pending)
+
+Pending Tasks
+=============
+Mochi: Brush coat
+Mochi: Morning walk
+Mochi: Breakfast
+Mochi: Wash bedding
+Luna: Clean litter box
+Luna: Give medication
+
+Luna's Tasks
+============
+Luna: Clean litter box (pending)
+Luna: Give medication (pending)
+Luna: Refresh water bowl (done)
+
+Today's Schedule
+================
+Daily plan for Jordan on 2026-07-06:
+  08:00-08:30 | Mochi: Morning walk (30 min, high)
+  08:30-08:40 | Mochi: Breakfast (10 min, high)
+  08:40-08:50 | Luna: Give medication (10 min, high)
+  08:50-09:10 | Luna: Clean litter box (20 min, medium)
+Skipped tasks:
+  Mochi: Wash bedding
+  Mochi: Brush coat
+Warnings:
+  Warning: Mochi's Breakfast (09:00-09:10) conflicts with Luna's Give medication (09:00-09:10).
+
+Recurring Tasks Created After Completion
+========================================
+Mochi: Morning walk next due on 2026-07-07
+Mochi: Wash bedding next due on 2026-07-13
+```
